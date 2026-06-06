@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mood Predictor AI</title>
+    <style>
+        body { font-family: Arial, sans-serif; background-color: #f4f4f9; padding: 20px; }
+        .container { max-width: 400px; margin: auto; background: white; padding: 30px; border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
+        input, select, button { width: 100%; padding: 10px; margin: 10px 0; box-sizing: border-box; }
+        button { background-color: #28a745; color: white; border: none; cursor: pointer; font-weight: bold; }
+        button:hover { background-color: #218838; }
+        .hidden { display: none; }
+        .switch-link { color: blue; text-decoration: underline; cursor: pointer; text-align: center; display: block;}
+    </style>
+</head>
+<body>
+
+<div class="container" id="auth-section">
+    <h2 id="form-title">Login</h2>
+    
+    <input type="text" id="username" placeholder="Username">
+    
+    <input type="email" id="email" class="hidden" placeholder="Email Address">
+    <input type="text" id="full-name" class="hidden" placeholder="Full Name">
+    
+    <input type="password" id="password" placeholder="Password">
+    
+    <select id="age" class="hidden">
+        <option value="" disabled selected>Select your Age Group</option>
+        <option value="0-20">0 - 20</option>
+        <option value="21-30">21 - 30</option>
+        <option value="31-45">31 - 45</option>
+        <option value="46-60">46 - 60</option>
+        <option value="60-70">60 - 70</option>
+        <option value="70-100">70+</option>
+    </select>
+
+    <button id="submit-btn" onclick="handleAuth()">Login</button>
+    <span class="switch-link" onclick="toggleAuthMode()">Don't have an account? Sign up here.</span>
+    <p id="auth-msg" style="color: red; text-align: center;"></p>
+</div>
+
+<div class="container hidden" id="dashboard-section">
+    <h2>Welcome, <span id="user-display"></span>!</h2>
+    <p>Your age is securely saved in the database.</p>
+
+    <label>Enter a sentence:</label>
+    <input type="text" id="text-input" placeholder="e.g., I am having a great day!">
+
+    <button onclick="predictMood()">Predict Mood</button>
+    
+    <h3 id="result-display"></h3>
+    
+    <button style="background-color: #dc3545; margin-top: 20px;" onclick="logout()">Logout</button>
+</div>
+
+<script>
+    let isLoginMode = true;
+
+    function toggleAuthMode() {
+        isLoginMode = !isLoginMode;
+        document.getElementById('form-title').innerText = isLoginMode ? "Login" : "Sign Up";
+        document.getElementById('submit-btn').innerText = isLoginMode ? "Login" : "Register";
+        document.querySelector('.switch-link').innerText = isLoginMode ? "Don't have an account? Sign up here." : "Already have an account? Login here.";
+        
+        // Grab the extra fields
+        const ageSelect = document.getElementById('age');
+        const emailInput = document.getElementById('email');
+        const fullNameInput = document.getElementById('full-name');
+
+        if (isLoginMode) {
+            ageSelect.classList.add('hidden');
+            emailInput.classList.add('hidden');
+            fullNameInput.classList.add('hidden');
+        } else {
+            ageSelect.classList.remove('hidden');
+            emailInput.classList.remove('hidden');
+            fullNameInput.classList.remove('hidden');
+        }
+    }
+
+    async function handleAuth() {
+        const username = document.getElementById('username').value;
+        const password = document.getElementById('password').value;
+        const age_group = document.getElementById('age').value;
+        
+        // Grab values from the new fields
+        const email = document.getElementById('email').value;
+        const full_name = document.getElementById('full-name').value;
+        
+        const msgBox = document.getElementById('auth-msg');
+
+        const endpoint = isLoginMode ? '/login' : '/register';
+        
+        // Update the payload to include email and full_name during registration
+        const payload = isLoginMode 
+            ? { username, password } 
+            : { username, password, age_group, email, full_name };
+
+        const response = await fetch(endpoint, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+
+        const data = await response.json();
+
+        if (response.ok) {
+            if (isLoginMode) {
+                document.getElementById('auth-section').classList.add('hidden');
+                document.getElementById('dashboard-section').classList.remove('hidden');
+                document.getElementById('user-display').innerText = data.username;
+                msgBox.innerText = "";
+            } else {
+                msgBox.style.color = "green";
+                msgBox.innerText = "Registration successful! Please login.";
+                toggleAuthMode();
+            }
+        } else {
+            msgBox.style.color = "red";
+            msgBox.innerText = data.error;
+        }
+    }
+
+    async function predictMood() {
+        const text = document.getElementById('text-input').value;
+
+        const response = await fetch('/predict', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ text }) 
+        });
+
+        const data = await response.json();
+        
+        if (response.ok) {
+            document.getElementById('result-display').innerText = `Mood Score: ${data.mood_score} (Age group used: ${data.age_used})`;
+        } else {
+            alert(data.error || "Something went wrong. Please log in again.");
+            logout();
+        }
+    }
+
+    async function logout() {
+        await fetch('/logout', { method: 'POST' });
+        document.getElementById('dashboard-section').classList.add('hidden');
+        document.getElementById('auth-section').classList.remove('hidden');
+        
+        // Clear all fields on logout
+        document.getElementById('username').value = "";
+        document.getElementById('password').value = "";
+        document.getElementById('email').value = "";
+        document.getElementById('full-name').value = "";
+        document.getElementById('result-display').innerText = "";
+    }
+</script>
+
+</body>
+</html>
